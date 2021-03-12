@@ -99,6 +99,25 @@ weeks:
     …
 ```
 
+Weeks that are longer than seven days may have more than one occurrence of a
+weekday.  Since that makes the `first-work-day` and `last-work-day` potentially
+ambiguous, you may also specify these as _offsets_ from the first day of the
+week.  For example, a week that starts on Sunday and has a length of eight days
+will have two Sundays: both the first and the last day of the week.  In this
+case `sun` would refer to the _first_ sunday only.  You could instead use `0`,
+which means zero days from the start of the week, or the first Sunday.  `1`
+would be Monday.  To refer to the _last_ sunday of the week, you would use `7`.
+For example:
+
+```yaml
+weeks:
+- start: 2021-02-28
+  first-work-day: 1 # this is Monday, since Feb 28th is a Sunday
+  last-work-day: 5  # this is Friday
+  clients:
+    …
+```
+
 ### Defaults
 
 You can set the default work days, which apply to all weeks that don't override

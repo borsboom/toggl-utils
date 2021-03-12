@@ -14,10 +14,17 @@ use std::io::BufReader;
 use structopt::StructOpt;
 use toggl_rs::{TimeEntry, Toggl, TogglExt};
 
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(untagged)]
+enum WorkDay {
+    Weekday(Weekday),
+    Offset(i64),
+}
+
 const DEFAULT_INPUT_FILE: &str = "toggl-ontrack.yaml";
 const DEFAULT_WEEK_LENGTH: i64 = 7;
-const DEFAULT_FIRST_WORK_DAY: Weekday = Weekday::Mon;
-const DEFAULT_LAST_WORK_DAY: Weekday = Weekday::Fri;
+const DEFAULT_FIRST_WORK_DAY: WorkDay = WorkDay::Weekday(Weekday::Mon);
+const DEFAULT_LAST_WORK_DAY: WorkDay = WorkDay::Weekday(Weekday::Fri);
 
 /// Keep work hours on track using Toggl data
 #[derive(Debug, StructOpt)]
@@ -58,16 +65,16 @@ struct ClientInput {
 struct WeekInput {
     start: NaiveDate,
     length: Option<i64>,
-    first_work_day: Option<Weekday>,
-    last_work_day: Option<Weekday>,
+    first_work_day: Option<WorkDay>,
+    last_work_day: Option<WorkDay>,
     clients: HashMap<String, ClientInput>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 struct DefaultsInput {
-    first_work_day: Option<Weekday>,
-    last_work_day: Option<Weekday>,
+    first_work_day: Option<WorkDay>,
+    last_work_day: Option<WorkDay>,
 }
 
 impl Default for DefaultsInput {
@@ -162,13 +169,18 @@ struct TotalDurations {
     durations: Durations,
 }
 
-fn weekday_offset(week_start: DateTime<Local>, weekday: Weekday) -> i64 {
-    let offset =
-        weekday.num_days_from_sunday() as i64 - week_start.weekday().num_days_from_sunday() as i64;
-    if offset < 0 {
-        offset + 7
-    } else {
-        offset
+fn work_day_offset(week_start: DateTime<Local>, work_day: WorkDay) -> i64 {
+    match work_day {
+        WorkDay::Weekday(weekday) => {
+            let offset = weekday.num_days_from_sunday() as i64
+                - week_start.weekday().num_days_from_sunday() as i64;
+            if offset < 0 {
+                offset + 7
+            } else {
+                offset
+            }
+        }
+        WorkDay::Offset(offset) => offset,
     }
 }
 
@@ -195,7 +207,7 @@ fn create_week_bucket_durations(
                 week_input.start.day(),
             )
             .and_hms(0, 0, 0);
-        let first_work_day_offset = weekday_offset(
+        let first_work_day_offset = work_day_offset(
             week_start,
             week_input.first_work_day.unwrap_or(
                 input
@@ -204,7 +216,7 @@ fn create_week_bucket_durations(
                     .unwrap_or(DEFAULT_FIRST_WORK_DAY),
             ),
         );
-        let last_work_day_offset = weekday_offset(
+        let last_work_day_offset = work_day_offset(
             week_start,
             week_input.last_work_day.unwrap_or(
                 input
